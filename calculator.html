@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIS Benchmark Severity Calculator</title>
+    <meta name="description" content="Universal CIS Benchmark Severity Calculator for AWS, Azure, GCP, and on-premises systems">
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        #root {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .share-link-box {
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .share-link-box:hover {
+            background: #e0f2fe;
+        }
+        .copied-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Lucide React icons as inline SVG components
+        const Shield = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+        );
+
+        const AlertCircle = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+        );
+
+        const Info = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+        );
+
+        const Cloud = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            </svg>
+        );
+
+        const Server = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                <line x1="6" y1="18" x2="6.01" y2="18"/>
+            </svg>
+        );
+
+        const HelpCircle = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+        );
+
+        const Share2 = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3"/>
+                <circle cx="6" cy="12" r="3"/>
+                <circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+        );
+
+        const Copy = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+        );
+
+        const CISBenchmarkCalculator = () => {
+            const [scores, setScores] = useState({
+                confidentialityImpact: 0,
+                integrityImpact: 0,
+                availabilityImpact: 0,
+                exploitability: 0,
+                scope: 0,
+                compliance: 0,
+                implementationComplexity: 0,
+                detectionDifficulty: 0
+            });
+
+            const [benchmarkInfo, setBenchmarkInfo] = useState({
+                controlId: '',
+                controlTitle: '',
+                platform: '',
+                environment: ''
+            });
+
+            const [showExamples, setShowExamples] = useState(false);
+            const [showShareLink, setShowShareLink] = useState(false);
+            const [copiedNotification, setCopiedNotification] = useState(false);
+
+            // Parse URL parameters on component mount
+            useEffect(() => {
+                const urlParams = new URLSearchParams(window.location.search);
+                
+                // Map of short parameter names to full names for compact URLs
+                const paramMap = {
+                    'control': 'controlId',
+                    'title': 'controlTitle',
+                    'platform': 'platform',
+                    'env': 'environment',
+                    'c': 'confidentialityImpact',
+                    'i': 'integrityImpact',
+                    'a': 'availabilityImpact',
+                    'e': 'exploitability',
+                    's': 'scope',
+                    'comp': 'compliance',
+                    'impl': 'implementationComplexity',
+                    'det': 'detectionDifficulty'
+                };
+
+                const newBenchmarkInfo = { ...benchmarkInfo };
+                const newScores = { ...scores };
+                let hasParams = false;
+
+                urlParams.forEach((value, key) => {
+                    const mappedKey = paramMap[key];
+                    if (mappedKey) {
+                        hasParams = true;
+                        if (['controlId', 'controlTitle', 'platform', 'environment'].includes(mappedKey)) {
+                            newBenchmarkInfo[mappedKey] = decodeURIComponent(value);
+                        } else {
+                            const numValue = parseInt(value);
+                            if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
+                                newScores[mappedKey] = numValue;
+                            }
+                        }
+                    }
+                });
+
+                if (hasParams) {
+                    setBenchmarkInfo(newBenchmarkInfo);
+                    setScores(newScores);
+                }
+            }, []);
+
+            const calculateSeverity = () => {
+                const impactScore = (scores.confidentialityImpact * 0.15) +
+                                   (scores.integrityImpact * 0.15) +
+                                   (scores.availabilityImpact * 0.15);
+                
+                const threatScore = (scores.exploitability * 0.15) +
+                                   (scores.scope * 0.12) +
+                                   (scores.detectionDifficulty * 0.08);
+                
+                const contextScore = (scores.compliance * 0.10) +
+                                    (scores.implementationComplexity * 0.10);
+                
+                const totalScore = (impactScore + threatScore + contextScore) * 10;
+                return Math.round(totalScore);
+            };
+
+            const getSeverityLevel = (score) => {
+                if (score >= 90) return { level: 'CRITICAL', color: 'bg-purple-600', textColor: 'text-purple-600' };
+                if (score >= 70) return { level: 'HIGH', color: 'bg-red-600', textColor: 'text-red-600' };
+                if (score >= 50) return { level: 'MEDIUM', color: 'bg-orange-500', textColor: 'text-orange-500' };
+                if (score >= 30) return { level: 'LOW', color: 'bg-yellow-500', textColor: 'text-yellow-500' };
+                return { level: 'INFORMATIONAL', color: 'bg-blue-500', textColor: 'text-blue-500' };
+            };
+
+            const severityScore = calculateSeverity();
+            const severityInfo = getSeverityLevel(severityScore);
+
+            const getRemediationPriority = (score) => {
+                if (score >= 90) return 'Immediate action required - address within 24 hours';
+                if (score >= 70) return 'High priority - address within 1 week';
+                if (score >= 50) return 'Medium priority - address within 1 month';
+                if (score >= 30) return 'Low priority - address in next quarterly review';
+                return 'Informational - address as resources permit';
+            };
+
+            const updateScore = (category, value) => {
+                setScores(prev => ({
+                    ...prev,
+                    [category]: parseInt(value)
+                }));
+            };
+
+            // Generate shareable URL with current state
+            const generateShareLink = () => {
+                const baseUrl = window.location.origin + window.location.pathname;
+                const params = new URLSearchParams();
+
+                // Only include non-zero/non-empty values for cleaner URLs
+                if (benchmarkInfo.controlId) params.append('control', benchmarkInfo.controlId);
+                if (benchmarkInfo.controlTitle) params.append('title', benchmarkInfo.controlTitle);
+                if (benchmarkInfo.platform) params.append('platform', benchmarkInfo.platform);
+                if (benchmarkInfo.environment) params.append('env', benchmarkInfo.environment);
+                
+                if (scores.confidentialityImpact > 0) params.append('c', scores.confidentialityImpact);
+                if (scores.integrityImpact > 0) params.append('i', scores.integrityImpact);
+                if (scores.availabilityImpact > 0) params.append('a', scores.availabilityImpact);
+                if (scores.exploitability > 0) params.append('e', scores.exploitability);
+                if (scores.scope > 0) params.append('s', scores.scope);
+                if (scores.compliance > 0) params.append('comp', scores.compliance);
+                if (scores.implementationComplexity > 0) params.append('impl', scores.implementationComplexity);
+                if (scores.detectionDifficulty > 0) params.append('det', scores.detectionDifficulty);
+
+                return params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+            };
+
+            const copyShareLink = async () => {
+                const link = generateShareLink();
+                try {
+                    await navigator.clipboard.writeText(link);
+                    setCopiedNotification(true);
+                    setTimeout(() => setCopiedNotification(false), 3000);
+                } catch (err) {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = link;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    setCopiedNotification(true);
+                    setTimeout(() => setCopiedNotification(false), 3000);
+                }
+            };
+
+            const exampleScenarios = {
+                aws: {
+                    title: "AWS Example: S3 Bucket Versioning Disabled",
+                    control: "CIS AWS 2.1.3",
+                    scores: {
+                        confidentialityImpact: 6,
+                        integrityImpact: 8,
+                        availabilityImpact: 7,
+                        exploitability: 7,
+                        scope: 6,
+                        detectionDifficulty: 3,
+                        compliance: 8,
+                        implementationComplexity: 2
+                    },
+                    reasoning: "High integrity impact (data loss/corruption), easy to exploit via API/console"
+                },
+                azure: {
+                    title: "Azure Example: NSG Allows RDP from Internet",
+                    control: "CIS Azure 6.3",
+                    scores: {
+                        confidentialityImpact: 9,
+                        integrityImpact: 9,
+                        availabilityImpact: 8,
+                        exploitability: 9,
+                        scope: 8,
+                        detectionDifficulty: 5,
+                        compliance: 9,
+                        implementationComplexity: 2
+                    },
+                    reasoning: "Critical security risk - direct internet RDP access"
+                },
+                gcp: {
+                    title: "GCP Example: Storage Bucket Publicly Accessible",
+                    control: "CIS GCP 5.1",
+                    scores: {
+                        confidentialityImpact: 10,
+                        integrityImpact: 7,
+                        availabilityImpact: 5,
+                        exploitability: 10,
+                        scope: 9,
+                        detectionDifficulty: 4,
+                        compliance: 10,
+                        implementationComplexity: 1
+                    },
+                    reasoning: "Complete data exposure, trivially exploitable"
+                },
+                windows: {
+                    title: "Windows Example: Password History Not Enforced",
+                    control: "CIS Windows Server 1.1.1",
+                    scores: {
+                        confidentialityImpact: 5,
+                        integrityImpact: 6,
+                        availabilityImpact: 4,
+                        exploitability: 5,
+                        scope: 7,
+                        detectionDifficulty: 7,
+                        compliance: 7,
+                        implementationComplexity: 2
+                    },
+                    reasoning: "Moderate security impact, affects all domain users"
+                }
+            };
+
+            const loadExample = (platform) => {
+                const example = exampleScenarios[platform];
+                setScores(example.scores);
+                setBenchmarkInfo({
+                    controlId: example.control,
+                    controlTitle: example.title.split(': ')[1],
+                    platform: platform.toUpperCase(),
+                    environment: ''
+                });
+                setShowExamples(false);
+            };
+
+            const ScoringSection = ({ title, description, category, options, cloudGuidance, onpremGuidance }) => (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{description}</p>
+                    {(cloudGuidance || onpremGuidance) && (
+                        <div className="text-xs text-gray-500 mb-3 space-y-1">
+                            {cloudGuidance && (
+                                <div className="flex items-start gap-1">
+                                    <span style={{width: '12px', height: '12px', marginTop: '2px'}}><Cloud /></span>
+                                    <span><strong>Cloud:</strong> {cloudGuidance}</span>
+                                </div>
+                            )}
+                            {onpremGuidance && (
+                                <div className="flex items-start gap-1">
+                                    <span style={{width: '12px', height: '12px', marginTop: '2px'}}><Server /></span>
+                                    <span><strong>On-Prem:</strong> {onpremGuidance}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <select
+                        value={scores[category]}
+                        onChange={(e) => updateScore(category, e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                        <option value="0">Select impact level...</option>
+                        {options.map((opt, idx) => (
+                            <option key={idx} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                </div>
+            );
+
+            return (
+                <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-2xl">
+                    {copiedNotification && (
+                        <div className="copied-notification">
+                            ✓ Shareable link copied to clipboard!
+                        </div>
+                    )}
+
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <span className="text-blue-600"><Shield /></span>
+                                <h1 className="text-3xl font-bold text-gray-900">Universal CIS Benchmark Severity Calculator</h1>
+                            </div>
+                            <button
+                                onClick={() => setShowShareLink(!showShareLink)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                                title="Generate shareable link"
+                            >
+                                <Share2 />
+                                Share
+                            </button>
+                        </div>
+                        
+                        {showShareLink && (
+                            <div className="mb-4 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                                <h3 className="text-sm font-semibold text-gray-800 mb-2">Shareable Link</h3>
+                                <p className="text-xs text-gray-600 mb-2">
+                                    Share this link with colleagues to show them your assessment. The URL contains all your current selections.
+                                </p>
+                                <div className="flex gap-2">
+                                    <div className="share-link-box flex-1" onClick={copyShareLink}>
+                                        {generateShareLink()}
+                                    </div>
+                                    <button
+                                        onClick={copyShareLink}
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm whitespace-nowrap"
+                                    >
+                                        <Copy />
+                                        Copy
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <p className="text-gray-600 mb-3">
+                            Assess the risk severity of CIS benchmark controls for cloud platforms (AWS, Azure, GCP) and 
+                            on-premises systems (Windows, Linux, network devices). Generate comprehensive severity scores (0-100 scale).
+                        </p>
+                        <button
+                            onClick={() => setShowExamples(!showExamples)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors text-sm"
+                        >
+                            <HelpCircle />
+                            {showExamples ? 'Hide Examples' : 'Show Example Scenarios'}
+                        </button>
+                    </div>
+
+                    {showExamples && (
+                        <div className="mb-8 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Example Scenarios - Load Pre-Filled Examples</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {Object.entries(exampleScenarios).map(([key, example]) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => loadExample(key)}
+                                        className="p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-blue-500 hover:shadow-md transition-all text-left"
+                                    >
+                                        <div className="font-semibold text-gray-800 mb-1">{example.title}</div>
+                                        <div className="text-xs text-gray-500 mb-2">{example.control}</div>
+                                        <div className="text-xs text-gray-600">{example.reasoning}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <Info />
+                            Benchmark Control Information
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input
+                                type="text"
+                                placeholder="Control ID (e.g., 1.1.1)"
+                                value={benchmarkInfo.controlId}
+                                onChange={(e) => setBenchmarkInfo({...benchmarkInfo, controlId: e.target.value})}
+                                className="p-2 border border-gray-300 rounded-md"
+                            />
+                            <select
+                                value={benchmarkInfo.platform}
+                                onChange={(e) => setBenchmarkInfo({...benchmarkInfo, platform: e.target.value})}
+                                className="p-2 border border-gray-300 rounded-md"
+                            >
+                                <option value="">Select Platform...</option>
+                                <optgroup label="Cloud Platforms">
+                                    <option value="AWS">AWS</option>
+                                    <option value="Azure">Microsoft Azure</option>
+                                    <option value="GCP">Google Cloud Platform</option>
+                                </optgroup>
+                                <optgroup label="Operating Systems">
+                                    <option value="Windows Server 2022">Windows Server 2022</option>
+                                    <option value="Windows Server 2019">Windows Server 2019</option>
+                                    <option value="Ubuntu 22.04">Ubuntu 22.04 LTS</option>
+                                    <option value="RHEL 9">Red Hat Enterprise Linux 9</option>
+                                </optgroup>
+                            </select>
+                            <input
+                                type="text"
+                                placeholder="Environment (e.g., Production)"
+                                value={benchmarkInfo.environment}
+                                onChange={(e) => setBenchmarkInfo({...benchmarkInfo, environment: e.target.value})}
+                                className="p-2 border border-gray-300 rounded-md"
+                            />
+                            <input
+                                type="text"
+                                placeholder="Control Title"
+                                value={benchmarkInfo.controlTitle}
+                                onChange={(e) => setBenchmarkInfo({...benchmarkInfo, controlTitle: e.target.value})}
+                                className="p-2 border border-gray-300 rounded-md"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Security Impact Assessment</h2>
+                        
+                        <ScoringSection
+                            title="Confidentiality Impact"
+                            description="Potential impact on data confidentiality if not implemented"
+                            category="confidentialityImpact"
+                            cloudGuidance="Consider S3/Blob Storage data, databases, API exposure"
+                            onpremGuidance="Consider file shares, databases, domain credentials"
+                            options={[
+                                { value: 1, label: 'None' },
+                                { value: 3, label: 'Low' },
+                                { value: 5, label: 'Medium' },
+                                { value: 7, label: 'High' },
+                                { value: 10, label: 'Critical' }
+                            ]}
+                        />
+
+                        <ScoringSection
+                            title="Integrity Impact"
+                            description="Potential impact on data/system integrity"
+                            category="integrityImpact"
+                            cloudGuidance="Consider resource modifications, IAM changes, data tampering"
+                            onpremGuidance="Consider system changes, data tampering, malware installation"
+                            options={[
+                                { value: 1, label: 'None' },
+                                { value: 3, label: 'Low' },
+                                { value: 5, label: 'Medium' },
+                                { value: 7, label: 'High' },
+                                { value: 10, label: 'Critical' }
+                            ]}
+                        />
+
+                        <ScoringSection
+                            title="Availability Impact"
+                            description="Potential impact on system availability"
+                            category="availabilityImpact"
+                            cloudGuidance="Consider service disruption, resource deletion, DDoS"
+                            onpremGuidance="Consider outages, system crashes, ransomware"
+                            options={[
+                                { value: 1, label: 'None' },
+                                { value: 3, label: 'Low' },
+                                { value: 5, label: 'Medium' },
+                                { value: 7, label: 'High' },
+                                { value: 10, label: 'Critical' }
+                            ]}
+                        />
+                    </div>
+
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Threat Assessment</h2>
+                        
+                        <ScoringSection
+                            title="Exploitability"
+                            description="How easy to exploit this misconfiguration?"
+                            category="exploitability"
+                            cloudGuidance="Consider public APIs, automated scanners"
+                            onpremGuidance="Consider network accessibility, available tools"
+                            options={[
+                                { value: 1, label: 'Very Difficult' },
+                                { value: 3, label: 'Difficult' },
+                                { value: 5, label: 'Moderate' },
+                                { value: 7, label: 'Easy' },
+                                { value: 10, label: 'Trivial' }
+                            ]}
+                        />
+
+                        <ScoringSection
+                            title="Scope of Impact"
+                            description="How many systems/users affected?"
+                            category="scope"
+                            cloudGuidance="Consider cross-account impact, multi-region"
+                            onpremGuidance="Consider domain policies, network segments"
+                            options={[
+                                { value: 1, label: 'Single Resource' },
+                                { value: 3, label: 'Multiple Resources' },
+                                { value: 5, label: 'Department Level' },
+                                { value: 7, label: 'Organization Wide' },
+                                { value: 10, label: 'Enterprise Critical' }
+                            ]}
+                        />
+
+                        <ScoringSection
+                            title="Detection Difficulty"
+                            description="How difficult to detect exploitation?"
+                            category="detectionDifficulty"
+                            cloudGuidance="Consider CloudTrail, Azure Monitor, Cloud Logging"
+                            onpremGuidance="Consider SIEM coverage, log collection"
+                            options={[
+                                { value: 1, label: 'Very Easy' },
+                                { value: 3, label: 'Easy' },
+                                { value: 5, label: 'Moderate' },
+                                { value: 7, label: 'Difficult' },
+                                { value: 10, label: 'Very Difficult' }
+                            ]}
+                        />
+                    </div>
+
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Implementation Context</h2>
+                        
+                        <ScoringSection
+                            title="Compliance Requirements"
+                            description="Required by regulatory frameworks?"
+                            category="compliance"
+                            options={[
+                                { value: 1, label: 'Not Required' },
+                                { value: 3, label: 'Best Practice' },
+                                { value: 5, label: 'Industry Standard' },
+                                { value: 7, label: 'Regulatory Recommendation' },
+                                { value: 10, label: 'Legally Required' }
+                            ]}
+                        />
+
+                        <ScoringSection
+                            title="Implementation Complexity"
+                            description="How complex to implement?"
+                            category="implementationComplexity"
+                            cloudGuidance="Consider IaC changes, multi-account deployment"
+                            onpremGuidance="Consider GPO, downtime requirements"
+                            options={[
+                                { value: 1, label: 'Very Simple' },
+                                { value: 3, label: 'Simple' },
+                                { value: 5, label: 'Moderate' },
+                                { value: 7, label: 'Complex' },
+                                { value: 10, label: 'Very Complex' }
+                            ]}
+                        />
+                    </div>
+
+                    <div className="mt-8 p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border-2 border-gray-300">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <AlertCircle />
+                            Severity Assessment Results
+                        </h2>
+                        
+                        {(benchmarkInfo.controlId || benchmarkInfo.platform) && (
+                            <div className="mb-4 text-sm text-gray-700 space-y-1">
+                                {benchmarkInfo.controlId && <div><strong>Control ID:</strong> {benchmarkInfo.controlId}</div>}
+                                {benchmarkInfo.controlTitle && <div><strong>Control:</strong> {benchmarkInfo.controlTitle}</div>}
+                                {benchmarkInfo.platform && <div><strong>Platform:</strong> {benchmarkInfo.platform}</div>}
+                                {benchmarkInfo.environment && <div><strong>Environment:</strong> {benchmarkInfo.environment}</div>}
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-6 mb-6">
+                            <div className="flex-1">
+                                <div className="text-sm text-gray-600 mb-2">Severity Score</div>
+                                <div className="text-6xl font-bold text-gray-900">{severityScore}</div>
+                                <div className="text-sm text-gray-500">out of 100</div>
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm text-gray-600 mb-2">Severity Level</div>
+                                <div className={`text-3xl font-bold ${severityInfo.textColor}`}>
+                                    {severityInfo.level}
+                                </div>
+                                <div className={`mt-2 h-3 rounded-full ${severityInfo.color}`}></div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-lg border border-gray-200 mb-4">
+                            <h3 className="font-semibold text-gray-800 mb-2">Remediation Priority</h3>
+                            <p className="text-gray-700">{getRemediationPriority(severityScore)}</p>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-lg border border-gray-200">
+                            <h3 className="font-semibold text-gray-800 mb-2">Score Breakdown</h3>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <span className="text-gray-600">Security Impact:</span>
+                                    <span className="font-semibold ml-2">
+                                        {Math.round((scores.confidentialityImpact + scores.integrityImpact + scores.availabilityImpact) / 3 * 10)}/100
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Threat Level:</span>
+                                    <span className="font-semibold ml-2">
+                                        {Math.round((scores.exploitability + scores.scope + scores.detectionDifficulty) / 3 * 10)}/100
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Compliance Factor:</span>
+                                    <span className="font-semibold ml-2">{scores.compliance * 10}/100</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Implementation Effort:</span>
+                                    <span className="font-semibold ml-2">{scores.implementationComplexity * 10}/100</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-gray-700">
+                        <strong>Methodology:</strong> Weighted scoring model - Security impact (45%), Threat factors (35%), 
+                        Contextual factors (20%). Works for both cloud and on-premises CIS benchmarks.
+                    </div>
+
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600">
+                        <strong>URL Parameters Guide:</strong> You can pre-fill the calculator using URL parameters:
+                        <ul className="mt-2 space-y-1 ml-4 list-disc">
+                            <li><code>control</code> - Control ID (e.g., 1.1.1)</li>
+                            <li><code>platform</code> - Platform name (e.g., AWS)</li>
+                            <li><code>title</code> - Control title</li>
+                            <li><code>env</code> - Environment (e.g., Production)</li>
+                            <li><code>c, i, a</code> - Confidentiality, Integrity, Availability (0-10)</li>
+                            <li><code>e, s, det</code> - Exploitability, Scope, Detection Difficulty (0-10)</li>
+                            <li><code>comp, impl</code> - Compliance, Implementation Complexity (0-10)</li>
+                        </ul>
+                        <p className="mt-2">Example: <code>?control=1.1.1&platform=AWS&c=7&i=8&a=5</code></p>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<CISBenchmarkCalculator />, document.getElementById('root'));
+    </script>
+</body>
+</html>

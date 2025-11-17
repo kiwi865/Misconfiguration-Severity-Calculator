@@ -363,14 +363,16 @@
                             {cloudGuidance && (
                                 <div className="flex items-start gap-1">
                                    <span className="flex items-center" style={{width: "14px", height: "14px"}}>
-    <Cloud style={{ width: "14px", height: "14px" }} />
-</span>
+                                        <Cloud style={{ width: "14px", height: "14px" }} />
+                                    </span>
                                     <span><strong>Cloud:</strong> {cloudGuidance}</span>
                                 </div>
                             )}
                             {onpremGuidance && (
                                 <div className="flex items-start gap-1">
-                                    <span style={{width: '12px', height: '12px', marginTop: '2px'}}><Server /></span>
+                                    <span className="flex items-center" style={{width: "14px", height: "14px"}}>
+                                        <Server style={{ width: "14px", height: "14px" }} />
+                                    </span>
                                     <span><strong>On-Prem:</strong> {onpremGuidance}</span>
                                 </div>
                             )}
@@ -401,7 +403,7 @@
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                                 <span className="text-blue-600"><Shield /></span>
-                                <h1 className="text-3xl font-bold text-gray-900">Universal CIS Benchmark Severity Calculator</h1>
+                                <h1 className="text-3xl font-bold text-gray-900">Misconfiguration Severity Calculator</h1>
                             </div>
                             <button
                                 onClick={() => setShowShareLink(!showShareLink)}
